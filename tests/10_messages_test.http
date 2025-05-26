@@ -1,0 +1,86 @@
+### Send msg-1 to logging service
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "msg-1"
+}
+
+### Send msg-2 to logging service
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "msg-2"
+}
+
+### Send msg-3 to logging service
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "msg-3"
+}
+
+### Send msg-4 to logging service
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "msg-4"
+}
+
+### Send msg-5 to logging service
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "msg-5"
+}
+
+### Send msg-6 to logging service
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "msg-6"
+}
+
+### Send msg-7 to logging service
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "msg-7"
+}
+
+### Send msg-8 to logging service
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "msg-8"
+}
+
+### Send msg-9 to logging service
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "msg-9"
+}
+
+### Send msg-10 to logging service
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "msg-10"
+}
+
+
+### GET all messages
+GET http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+###

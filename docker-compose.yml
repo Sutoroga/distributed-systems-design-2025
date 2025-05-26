@@ -1,0 +1,129 @@
+services:
+
+  # Facade Service
+  facade_service:
+    build: ./facade_service
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    networks:
+      - lab3-network
+    depends_on:
+      - config_service
+
+  # Messages Service
+  messages_service:
+    build: ./messages_service
+    ports:
+      - "8200:8002"
+    env_file:
+      - .env
+    networks:
+      - lab3-network
+
+  # Logging Service replicas
+  logging_service-1:
+    build: ./logging_service
+    ports:
+      - "8001:8001"  # gRPC port
+    env_file:
+      - .env
+    environment:
+      - HAZELCAST_NODE=hz-node-1
+      - CLUSTER_NAME=${CLUSTER_NAME}
+    depends_on:
+      - hz-node-1
+    networks:
+      - lab3-network
+
+  logging_service-2:
+    build: ./logging_service
+    ports:
+      - "8002:8001"
+    env_file:
+      - .env
+    environment:
+      - HAZELCAST_NODE=hz-node-2
+      - CLUSTER_NAME=${CLUSTER_NAME}
+    depends_on:
+      - hz-node-2
+    networks:
+      - lab3-network
+
+  logging_service-3:
+    build: ./logging_service
+    ports:
+      - "8003:8001"
+    env_file:
+      - .env
+    environment:
+      - HAZELCAST_NODE=hz-node-3
+      - CLUSTER_NAME=${CLUSTER_NAME}
+    depends_on:
+      - hz-node-3
+    networks:
+      - lab3-network
+
+  hazelcast-mc:
+    image: hazelcast/management-center:latest
+    container_name: hazelcast-mc
+    environment:
+      - MC_DEFAULT_CLUSTER=${CLUSTER_NAME}
+      - MC_DEFAULT_CLUSTER_MEMBERS=hz-node-1,hz-node-2,hz-node-3
+      - MC_ADMIN_USER=${MC_ADMIN_USER}
+      - MC_ADMIN_PASSWORD=${MC_ADMIN_PASSWORD}
+    ports:
+      - "8080:8080"
+    networks:
+      - lab3-network
+
+  # Hazelcast Nodes
+  hz-node-1:
+    image: hazelcast/hazelcast:5-slim
+    container_name: hz-node-1
+    environment:
+      - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5701
+      - HZ_CLUSTERNAME=${CLUSTER_NAME}
+      - HAZELCAST_CONFIG=config/hazelcast.yaml
+    ports:
+      - "5701:5701"
+    networks:
+      - lab3-network
+        
+  hz-node-2:
+    image: hazelcast/hazelcast:5-slim
+    container_name: hz-node-2
+    environment:
+      - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5702
+      - HZ_CLUSTERNAME=${CLUSTER_NAME}
+      - HAZELCAST_CONFIG=config/hazelcast.yaml
+    ports:
+      - "5702:5701"
+    networks:
+      - lab3-network
+  
+  hz-node-3:
+    image: hazelcast/hazelcast:5-slim
+    container_name: hz-node-3
+    environment:
+      - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5703
+      - HZ_CLUSTERNAME=${CLUSTER_NAME}
+      - HAZELCAST_CONFIG=config/hazelcast.yaml
+    ports:
+      - "5703:5701"
+    networks:
+      - lab3-network
+
+  config_service:
+    build: ./config_service
+    ports:
+      - "8500:8500"
+    networks:
+      - lab3-network
+
+
+networks:
+  lab3-network:
+    name: lab3-network
+    driver: bridge
