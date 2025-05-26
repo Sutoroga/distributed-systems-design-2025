@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+python-dotenv
+requests
+grpcio
+protobuf==5.29.4

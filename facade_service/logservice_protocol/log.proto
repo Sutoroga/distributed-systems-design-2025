@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package logservice_protocol;
+
+service LogService {
+  rpc LogMessage (LogRequest) returns (LogResponse);
+  rpc GetMessages (Empty) returns (Messages);
+}
+
+message LogRequest {
+  string id = 1;
+  string msg = 2;
+}
+
+message LogResponse {
+  string status = 1;
+  string id = 2;
+}
+
+message Messages {
+  repeated string messages = 1;
+}
+
+message Empty {}

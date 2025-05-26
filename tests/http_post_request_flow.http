@@ -1,0 +1,15 @@
+### Test: POST a message to facade-service
+# This should generate a UUID and forward the message to logging_service
+
+POST http://127.0.0.1:8000/facade-service
+Content-Type: application/json
+
+{
+  "msg": "Hello from POST test!"
+}
+
+### Test: GET request to logging-service (verify message was stored)
+# After posting above, this should return a list including the message
+
+GET http://127.0.0.1:800o/facade-service
+Accept: application/json
