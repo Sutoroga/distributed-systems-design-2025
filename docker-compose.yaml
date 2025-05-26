@@ -1,0 +1,61 @@
+services:
+
+  hazelcast-mc:
+    image: hazelcast/management-center:latest
+    container_name: hazelcast-mc
+    environment:
+      - MC_DEFAULT_CLUSTER=${CLUSTER_NAME}
+      - MC_DEFAULT_CLUSTER_MEMBERS=node-1,node-2,node-3
+      - MC_ADMIN_USER=${MC_ADMIN_USER}
+      - MC_ADMIN_PASSWORD=${MC_ADMIN_PASSWORD}
+    ports:
+      - "8080:8080"
+    networks:
+      - hazelcast-net
+
+  node-1:
+    image: hazelcast/hazelcast:5-slim
+    container_name: node-1
+    environment:
+      - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5701
+      - HZ_CLUSTERNAME=${CLUSTER_NAME}
+      - HAZELCAST_CONFIG=config/hazelcast.yaml
+    volumes:
+      - ./hazelcast.yaml:/opt/hazelcast/config/hazelcast.yaml
+    ports:
+      - "5701:5701"
+    networks:
+      - hazelcast-net
+
+  node-2:
+    image: hazelcast/hazelcast:5-slim
+    container_name: node-2
+    environment:
+      - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5702
+      - HZ_CLUSTERNAME=${CLUSTER_NAME}
+      - HAZELCAST_CONFIG=config/hazelcast.yaml
+    volumes:
+      - ./hazelcast.yaml:/opt/hazelcast/config/hazelcast.yaml
+    ports:
+      - "5702:5701"
+    networks:
+      - hazelcast-net
+
+  node-3:
+    image: hazelcast/hazelcast:5-slim
+    container_name: node-3
+    environment:
+      - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5703
+      - HZ_CLUSTERNAME=${CLUSTER_NAME}
+      - HAZELCAST_CONFIG=config/hazelcast.yaml
+    volumes:
+      - ./hazelcast.yaml:/opt/hazelcast/config/hazelcast.yaml
+    ports:
+      - "5703:5701"
+    networks:
+      - hazelcast-net
+
+networks:
+  hazelcast-net:
+    name: hazelcast-net
+    driver: bridge

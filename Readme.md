@@ -1,10 +1,20 @@
 # Distributed Systems Design 2025
 
-## Micro Basics
+## Hazelcast
 
-Environment variables to be specified in `.env`:
+env:
+```dotenv
+CLUSTER_NAME=my-hazelcast-cluster
 
-```bash
-LOGGING_SERVICE_URL=http://logging_service:8001
-MESSAGES_SERVICE_URL=http://messages_service:8002
+PUBLIC_IP=<IP>
+
+MC_ADMIN_USER=<USERNAME>
+MC_ADMIN_PASSWORD=<PASSWORD>
 ```
+
+Launch with:
+```bash
+docker compose build; docker compose up -d
+```
+
+`scripts/` directory contains all relevant tasks code.
