@@ -4,3 +4,4 @@ python-dotenv
 requests
 grpcio
 protobuf==5.29.4
+confluent-kafka

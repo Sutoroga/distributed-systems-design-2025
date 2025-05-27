@@ -1,29 +1,140 @@
 services:
 
   # Facade Service
-  facade_service:
+  facade-service:
+    container_name: facade-service
     build: ./facade_service
     ports:
       - "8000:8000"
     env_file:
       - .env
     networks:
-      - lab3-network
+      - lab4-network
     depends_on:
-      - config_service
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
 
   # Messages Service
-  messages_service:
+  messages-service-1:
+    container_name: messages-service-1
     build: ./messages_service
     ports:
       - "8200:8002"
     env_file:
       - .env
+#    environment:
+#      - KAFKA_GROUP_ID="messages-service-group-1"
     networks:
-      - lab3-network
+      - lab4-network
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+
+  messages-service-2:
+    container_name: messages-service-2
+    build: ./messages_service
+    ports:
+      - "8201:8002"
+    env_file:
+      - .env
+#    environment:
+#      - KAFKA_GROUP_ID="messages-service-group-2"
+    networks:
+      - lab4-network
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+
+  kafka-1:
+    image: bitnami/kafka:latest
+    container_name: kafka-1
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      - KAFKA_KRAFT_CLUSTER_ID=kraft-cluster
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-1:9092
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=3
+    ports:
+      - "9092:9092"
+    networks:
+      - lab4-network
+    healthcheck:
+      test: [ "CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka-2:
+    image: bitnami/kafka:latest
+    container_name: kafka-2
+    environment:
+      - KAFKA_CFG_NODE_ID=2
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      - KAFKA_KRAFT_CLUSTER_ID=kraft-cluster
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-2:9092
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=3
+    ports:
+      - "9093:9092"
+    networks:
+      - lab4-network
+    healthcheck:
+      test: [ "CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka-3:
+    image: bitnami/kafka:latest
+    container_name: kafka-3
+    environment:
+      - KAFKA_CFG_NODE_ID=3
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      - KAFKA_KRAFT_CLUSTER_ID=kraft-cluster
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-3:9092
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=3
+    ports:
+      - "9094:9092"
+    networks:
+      - lab4-network
+    healthcheck:
+      test: [ "CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Logging Service replicas
-  logging_service-1:
+  logging-service-1:
+    container_name: logging-service-1
     build: ./logging_service
     ports:
       - "8001:8001"  # gRPC port
@@ -35,9 +146,10 @@ services:
     depends_on:
       - hz-node-1
     networks:
-      - lab3-network
+      - lab4-network
 
-  logging_service-2:
+  logging-service-2:
+    container_name: logging-service-2
     build: ./logging_service
     ports:
       - "8002:8001"
@@ -49,9 +161,10 @@ services:
     depends_on:
       - hz-node-2
     networks:
-      - lab3-network
+      - lab4-network
 
-  logging_service-3:
+  logging-service-3:
+    container_name: logging-service-3
     build: ./logging_service
     ports:
       - "8003:8001"
@@ -63,7 +176,7 @@ services:
     depends_on:
       - hz-node-3
     networks:
-      - lab3-network
+      - lab4-network
 
   hazelcast-mc:
     image: hazelcast/management-center:latest
@@ -76,7 +189,7 @@ services:
     ports:
       - "8080:8080"
     networks:
-      - lab3-network
+      - lab4-network
 
   # Hazelcast Nodes
   hz-node-1:
@@ -85,11 +198,10 @@ services:
     environment:
       - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5701
       - HZ_CLUSTERNAME=${CLUSTER_NAME}
-      - HAZELCAST_CONFIG=config/hazelcast.yaml
     ports:
       - "5701:5701"
     networks:
-      - lab3-network
+      - lab4-network
         
   hz-node-2:
     image: hazelcast/hazelcast:5-slim
@@ -97,11 +209,10 @@ services:
     environment:
       - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5702
       - HZ_CLUSTERNAME=${CLUSTER_NAME}
-      - HAZELCAST_CONFIG=config/hazelcast.yaml
     ports:
       - "5702:5701"
     networks:
-      - lab3-network
+      - lab4-network
   
   hz-node-3:
     image: hazelcast/hazelcast:5-slim
@@ -109,21 +220,21 @@ services:
     environment:
       - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5703
       - HZ_CLUSTERNAME=${CLUSTER_NAME}
-      - HAZELCAST_CONFIG=config/hazelcast.yaml
     ports:
       - "5703:5701"
     networks:
-      - lab3-network
+      - lab4-network
 
-  config_service:
+  config-service:
+    container_name: config-service
     build: ./config_service
     ports:
       - "8500:8500"
     networks:
-      - lab3-network
+      - lab4-network
 
 
 networks:
-  lab3-network:
-    name: lab3-network
+  lab4-network:
+    name: lab4-network
     driver: bridge

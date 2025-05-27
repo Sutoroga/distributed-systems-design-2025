@@ -1,10 +1,11 @@
 {
   "logging-service": [
-    "logging_service-1:8001",
-    "logging_service-2:8001",
-    "logging_service-3:8001"
+    "logging-service-1:8001",
+    "logging-service-2:8001",
+    "logging-service-3:8001"
   ],
   "messages-service": [
-    "messages_service:8200"
+    "messages-service-1:8002",
+    "messages-service-2:8002"
   ]
 }
