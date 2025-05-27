@@ -85,7 +85,6 @@ services:
     environment:
       - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5701
       - HZ_CLUSTERNAME=${CLUSTER_NAME}
-      - HAZELCAST_CONFIG=config/hazelcast.yaml
     ports:
       - "5701:5701"
     networks:
@@ -97,7 +96,6 @@ services:
     environment:
       - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5702
       - HZ_CLUSTERNAME=${CLUSTER_NAME}
-      - HAZELCAST_CONFIG=config/hazelcast.yaml
     ports:
       - "5702:5701"
     networks:
@@ -109,7 +107,6 @@ services:
     environment:
       - HZ_NETWORK_PUBLICADDRESS=${PUBLIC_IP}:5703
       - HZ_CLUSTERNAME=${CLUSTER_NAME}
-      - HAZELCAST_CONFIG=config/hazelcast.yaml
     ports:
       - "5703:5701"
     networks:
