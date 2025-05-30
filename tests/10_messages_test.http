@@ -79,6 +79,6 @@ Content-Type: application/json
 }
 
 
-#### GET all messages
-#GET http://127.0.0.1:8000/facade-service
-#Content-Type: application/json
+### GET all messages
+GET http://127.0.0.1:8000/facade-service
+Content-Type: application/json

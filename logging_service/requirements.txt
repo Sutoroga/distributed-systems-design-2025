@@ -5,4 +5,5 @@ requests
 grpcio
 protobuf==5.29.4
 hazelcast-python-client
-
+py-consul
+grpcio-health-checking

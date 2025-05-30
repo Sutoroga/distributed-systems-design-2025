@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import grpc
-import os
 import uuid
 import requests
 import time
@@ -13,7 +12,9 @@ from confluent_kafka.admin import AdminClient, NewTopic
 
 from logservice_protocol import log_pb2, log_pb2_grpc
 
-# Configure logging
+from consul_api import register_service, get_service_addresses, get_value_from_consul_kv
+
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(message)s',
@@ -22,36 +23,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info("Facade-Service starting up...")
 
-# Load .env
-load_dotenv()
 
-CONFIG_SERVER_URL = os.getenv("CONFIG_SERVER_URL")
+load_dotenv()
 
 # Retry settings
 MAX_RETRY_WINDOW = 60
 RETRY_INTERVAL = 2
-
-KAFKA_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS")
-KAFKA_TOPIC = os.getenv("KAFKA_TOPIC")
+# Kafka variables to be filled with values after 1st kafka usage
+kafka_bootstrap_servers = None
+kafka_topic = None
 _kafka_producer = None
+
+register_service("facade-service", 8000)
 app = FastAPI()
 
 class MessageRequest(BaseModel):
     msg: str
-
-
-def get_service_addresses(service_name: str):
-    try:
-        response = requests.get(f"{CONFIG_SERVER_URL}/services/{service_name}")
-        response.raise_for_status()
-        addresses = response.json()
-        if not addresses:
-            raise ValueError(f"No instances found for {service_name}")
-        return addresses
-    except Exception as e:
-        logger.error(f"Error fetching service instances from config-server: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get service info: {str(e)}")
-
 
 def send_log_message(id: str, msg: str, target: str):
     try:
@@ -67,26 +54,35 @@ def send_log_message(id: str, msg: str, target: str):
         raise
 
 def ensure_kafka_topic_exists():
-    a = AdminClient({'bootstrap.servers': KAFKA_SERVERS})
-
-    new_topics = [NewTopic(topic, num_partitions=3, replication_factor=3) for topic in [KAFKA_TOPIC]]
-    fs = a.create_topics(new_topics)
-
-    for topic, f in fs.items():
-        try:
-            f.result()
-            logger.info("Topic {} created".format(topic))
-        except Exception as e:
-            logger.error("Failed to create topic {}: {}".format(topic, e))
+    global kafka_bootstrap_servers, kafka_topic
+    if kafka_bootstrap_servers and kafka_topic:
+        a = AdminClient({'bootstrap.servers': kafka_bootstrap_servers})
+        new_topics = [NewTopic(kafka_topic, num_partitions=3, replication_factor=3)]
+        fs = a.create_topics(new_topics)
+        for topic, f in fs.items():
+            try:
+                f.result()
+                logger.info(f"Topic {topic} created")
+            except Exception as e:
+                logger.error(f"Failed to create topic {topic}: {e}")
+    else:
+        logger.warning("Kafka bootstrap servers or topic not configured, skipping topic creation.")
 
 def get_kafka_producer():
-    global _kafka_producer
-    if _kafka_producer is None:
+    global _kafka_producer, kafka_bootstrap_servers
+    if _kafka_producer is None and kafka_bootstrap_servers:
         logger.info("Initializing Kafka producer...")
-        _kafka_producer = Producer({"bootstrap.servers": KAFKA_SERVERS})
+        _kafka_producer = Producer({"bootstrap.servers": kafka_bootstrap_servers})
+    elif _kafka_producer is None:
+        logger.warning("Kafka bootstrap servers not configured, producer not initialized.")
     return _kafka_producer
 
 def produce_to_kafka(message_id: str, msg: str):
+    global kafka_topic
+    if not kafka_bootstrap_servers or not kafka_topic:
+        logger.warning("Kafka bootstrap servers or topic not configured, cannot produce.")
+        return
+
     payload = msg
     deadline = time.time() + 30  # retry window
     attempt = 1
@@ -94,10 +90,15 @@ def produce_to_kafka(message_id: str, msg: str):
     while time.time() < deadline:
         try:
             producer = get_kafka_producer()
-            producer.produce(KAFKA_TOPIC, value=payload)
-            producer.flush()
-            logger.info(f"[Kafka] Message enqueued (attempt {attempt}): {payload}")
-            return
+            if producer:
+                producer.produce(kafka_topic, value=payload)
+                producer.flush()
+                logger.info(f"[Kafka] Message enqueued (attempt {attempt}): {payload}")
+                return
+            else:
+                logger.warning("[Kafka] Producer not initialized, cannot send message.")
+                time.sleep(2)
+                attempt += 1
         except Exception as e:
             logger.warning(f"[Kafka] Attempt {attempt} failed: {e}")
             time.sleep(2)
@@ -106,8 +107,21 @@ def produce_to_kafka(message_id: str, msg: str):
     logger.error(f"[Kafka] All retry attempts failed for: {payload}")
     raise Exception("Kafka not available after retries")
 
-# Create Kafka topic at init
-ensure_kafka_topic_exists()
+@app.on_event("startup")
+async def startup_event():
+    global kafka_bootstrap_servers, kafka_topic
+    try:
+        kafka_bootstrap_servers = get_value_from_consul_kv("kafka/bootstrap_servers")
+        logger.info(f"Kafka Bootstrap Servers from Consul: {kafka_bootstrap_servers}")
+        kafka_topic = get_value_from_consul_kv("kafka/topic")
+        logger.info(f"Kafka Topic from Consul: {kafka_topic}")
+        ensure_kafka_topic_exists()
+    except HTTPException as e:
+        logger.error(f"Failed to load Kafka config from Consul: {e.detail}")
+
+    except Exception as e:
+        logger.error(f"An unexpected error occurred while loading Kafka config: {e}")
+
 
 @app.post("/facade-service")
 def send_message(request: MessageRequest):
@@ -145,7 +159,6 @@ def send_message(request: MessageRequest):
 def fetch_combined_response():
     logger.info("Received GET request to /facade-service")
 
-    # Fetch logs from logging-service
     logging_services = get_service_addresses("logging-service")
     random.shuffle(logging_services)
 
@@ -162,26 +175,28 @@ def fetch_combined_response():
             logger.warning(f"Failed to fetch logs from {target}: {e.code().name}")
             continue
 
-    messages_service = get_service_addresses("messages-service")
-    random.shuffle(messages_service)
+    messages_services = get_service_addresses("messages-service")
+    random.shuffle(messages_services)
 
     messages = "Unavailable"
-    for target in messages_service:
+    for target in messages_services:
         try:
             msg_response = requests.get(f"http://{target}/message/")
             msg_response.raise_for_status()
             messages = msg_response.text
             logger.info(f"Retrieved messages from {target}")
             break
-        except grpc.RpcError as e:
-            logger.warning(f"Failed to fetch messages from {target}: {e.code().name}")
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Failed to fetch messages from {target}: {e}")
             continue
 
     return {"response": (logs + " " + messages).strip()}
 
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     logger.info("Facade-Service running on port 8000")
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

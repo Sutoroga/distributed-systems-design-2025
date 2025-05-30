@@ -1,5 +1,66 @@
 services:
 
+  consul:
+    image: hashicorp/consul:latest
+    container_name: consul
+    ports:
+      - "8501:8500"
+      - "8600:8600/udp"
+    command: agent -dev -client=0.0.0.0
+    networks:
+      - lab5-network
+
+  consul-init:
+    image: alpine/curl
+    depends_on:
+      - consul
+    command: |
+      sh -c '
+        until curl -f ${CONSUL_HTTP_ADDR}/v1/status/leader; do
+          echo "Waiting for Consul to be ready..."
+          sleep 1
+        done
+        echo "Consul is ready. Pushing configurations from .env..."
+
+        # Hazelcast configuration
+        if [ -n "${HAZELCAST_NODES}" ]; then
+          curl -X PUT -d "${HAZELCAST_NODES}" ${CONSUL_HTTP_ADDR}/v1/kv/hazelcast/members
+          echo "Pushed hazelcast/members: ${HAZELCAST_NODES}"
+        else
+          echo "HAZELCAST_NODES not set in .env."
+        fi
+        if [ -n "${CLUSTER_NAME}" ]; then
+          curl -X PUT -d "${CLUSTER_NAME}" ${CONSUL_HTTP_ADDR}/v1/kv/hazelcast/cluster_name
+          echo "Pushed hazelcast/cluster_name: ${CLUSTER_NAME}"
+        else
+          echo "CLUSTER_NAME not set in .env."
+        fi
+
+        echo "Hazelcast configuration push complete."
+
+        echo "Pushing Kafka configuration from .env..."
+
+        # Kafka bootstrap servers
+        if [ -n "${KAFKA_BOOTSTRAP_SERVERS}" ]; then
+          curl -X PUT -d "${KAFKA_BOOTSTRAP_SERVERS}" ${CONSUL_HTTP_ADDR}/v1/kv/kafka/bootstrap_servers
+          echo "Pushed kafka/bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS}"
+        else
+          echo "KAFKA_BOOTSTRAP_SERVERS not set in .env."
+        fi
+        # Kafka queue name (topic)
+        if [ -n "${KAFKA_TOPIC}" ]; then
+          curl -X PUT -d "${KAFKA_TOPIC}" ${CONSUL_HTTP_ADDR}/v1/kv/kafka/topic
+          echo "Pushed kafka/topic: ${KAFKA_TOPIC}"
+        else
+          echo "KAFKA_TOPIC not set in .env."
+        fi
+
+        echo "Kafka configuration push complete."
+      '
+    networks:
+      - lab5-network
+
+
   # Facade Service
   facade-service:
     container_name: facade-service
@@ -9,8 +70,10 @@ services:
     env_file:
       - .env
     networks:
-      - lab4-network
+      - lab5-network
     depends_on:
+      consul-init:
+        condition: service_completed_successfully
       kafka-1:
         condition: service_healthy
       kafka-2:
@@ -26,10 +89,10 @@ services:
       - "8200:8002"
     env_file:
       - .env
-#    environment:
-#      - KAFKA_GROUP_ID="messages-service-group-1"
+    environment:
+      - KAFKA_GROUP_ID="messages-service-group-1"
     networks:
-      - lab4-network
+      - lab5-network
     depends_on:
       kafka-1:
         condition: service_healthy
@@ -45,10 +108,10 @@ services:
       - "8201:8002"
     env_file:
       - .env
-#    environment:
-#      - KAFKA_GROUP_ID="messages-service-group-2"
+    environment:
+      - KAFKA_GROUP_ID="messages-service-group-2"
     networks:
-      - lab4-network
+      - lab5-network
     depends_on:
       kafka-1:
         condition: service_healthy
@@ -75,7 +138,7 @@ services:
     ports:
       - "9092:9092"
     networks:
-      - lab4-network
+      - lab5-network
     healthcheck:
       test: [ "CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
       interval: 10s
@@ -100,7 +163,7 @@ services:
     ports:
       - "9093:9092"
     networks:
-      - lab4-network
+      - lab5-network
     healthcheck:
       test: [ "CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
       interval: 10s
@@ -125,7 +188,7 @@ services:
     ports:
       - "9094:9092"
     networks:
-      - lab4-network
+      - lab5-network
     healthcheck:
       test: [ "CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
       interval: 10s
@@ -145,8 +208,9 @@ services:
       - CLUSTER_NAME=${CLUSTER_NAME}
     depends_on:
       - hz-node-1
+      - consul
     networks:
-      - lab4-network
+      - lab5-network
 
   logging-service-2:
     container_name: logging-service-2
@@ -160,8 +224,9 @@ services:
       - CLUSTER_NAME=${CLUSTER_NAME}
     depends_on:
       - hz-node-2
+      - consul
     networks:
-      - lab4-network
+      - lab5-network
 
   logging-service-3:
     container_name: logging-service-3
@@ -175,8 +240,9 @@ services:
       - CLUSTER_NAME=${CLUSTER_NAME}
     depends_on:
       - hz-node-3
+      - consul
     networks:
-      - lab4-network
+      - lab5-network
 
   hazelcast-mc:
     image: hazelcast/management-center:latest
@@ -189,7 +255,7 @@ services:
     ports:
       - "8080:8080"
     networks:
-      - lab4-network
+      - lab5-network
 
   # Hazelcast Nodes
   hz-node-1:
@@ -201,8 +267,9 @@ services:
     ports:
       - "5701:5701"
     networks:
-      - lab4-network
+      - lab5-network
         
+
   hz-node-2:
     image: hazelcast/hazelcast:5-slim
     container_name: hz-node-2
@@ -212,7 +279,7 @@ services:
     ports:
       - "5702:5701"
     networks:
-      - lab4-network
+      - lab5-network
   
   hz-node-3:
     image: hazelcast/hazelcast:5-slim
@@ -223,18 +290,10 @@ services:
     ports:
       - "5703:5701"
     networks:
-      - lab4-network
-
-  config-service:
-    container_name: config-service
-    build: ./config_service
-    ports:
-      - "8500:8500"
-    networks:
-      - lab4-network
+      - lab5-network
 
 
 networks:
-  lab4-network:
-    name: lab4-network
+  lab5-network:
+    name: lab5-network
     driver: bridge
