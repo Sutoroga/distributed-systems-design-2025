@@ -4,6 +4,9 @@
 
 .env
 ```dotenv
+CLUSTER_NAME=my-hazelcast-cluster
+HAZELCAST_NODES=hz-node-1:5701,hz-node-2:5701,hz-node-3:5701
+
 PUBLIC_IP=<IP>
 
 CONSUL_HOST=consul
